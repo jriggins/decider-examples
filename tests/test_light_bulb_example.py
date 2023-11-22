@@ -12,7 +12,10 @@ import pytest
 
 
 class BaseModel(pydantic.BaseModel):
-    ...
+    def __eq__(self, other):
+        if issubclass(other.__class__, self.__class__):
+            return self.dict() == other.dict()
+        return False
 
 
 class Event(BaseModel):
@@ -79,6 +82,9 @@ class SwitchLightOn(LightSwitchCommand):
 class SwitchLightOff(LightSwitchCommand):
     ...
 
+class ToggleLightSwitch(LightSwitchCommand):
+    ...
+
 
 ###############
 # States/Views
@@ -113,6 +119,14 @@ class LightSwitchService:
             command: LightSwitchCommand, state: LightSwitch
         ) -> typing.Iterator[LightSwitchEvent]:
             match command:
+                case ToggleLightSwitch():
+                    match state:
+                        case LightSwitchOff():
+                            return iter([LightSwitchedOn()])
+                        case LightSwitchOn():
+                            return iter([LightSwitchedOff()])
+                        case _:
+                            return typing.assert_never(state)
                 case SwitchLightOn():
                     match state:
                         case LightSwitchOff():
@@ -142,53 +156,37 @@ class LightSwitchService:
     "test_name, decider, initial_state, events, command, expected_events",
     [
         (
-            "switch light on when off should turn on",
-            LightSwitchService().light_switch_decider(),
-            LightSwitchOn(),
-            [LightSwitchedOff()],
-            SwitchLightOn(),
-            [LightSwitchedOn()],
-        ),
-        (
-            "switch light on when on should stay on",
-            LightSwitchService().light_switch_decider(),
-            LightSwitchOn(),
-            [LightSwitchedOn()],
-            SwitchLightOn(),
-            [],
-        ),
-        (
-            "switch light off when on should turn off",
+            "toggle switch when no previous events should turn on",
             LightSwitchService().light_switch_decider(),
             LightSwitchOff(),
+            [],
+            ToggleLightSwitch(),
             [LightSwitchedOn()],
-            SwitchLightOff(),
-            [LightSwitchedOff()],
         ),
         (
-            "switch light off when off should stay off",
+            "toggle switch when on should turn off",
             LightSwitchService().light_switch_decider(),
             LightSwitchOff(),
             [LightSwitchedOff()],
-            SwitchLightOff(),
-            [],
+            ToggleLightSwitch(),
+            [LightSwitchedOn()],
         ),
-        # (
-        #     "switch light on when unknown should turn on",
-        #     LightSwitchService().light_switch_decider(),
-        #     LightSwitchOn(),
-        #     [],
-        #     SwitchLightOn(),
-        #     [LightSwitchedOn()],
-        # ),
-        # (
-        #     "switch light off when unknown should turn off",
-        #     LightSwitchService().light_switch_decider(),
-        #     LightSwitchOff(),
-        #     [],
-        #     SwitchLightOff(),
-        #     [LightSwitchedOff()],
-        # ),
+        (
+            "toggle switch when off should turn on 2",
+            LightSwitchService().light_switch_decider(),
+            LightSwitchOff(),
+            [LightSwitchedOn(), LightSwitchedOff()],
+            ToggleLightSwitch(),
+            [LightSwitchedOn()],
+        ),
+        (
+            "toggle switch when on should turn off 2",
+            LightSwitchService().light_switch_decider(),
+            LightSwitchOff(),
+            [LightSwitchedOn(), LightSwitchedOff(), LightSwitchedOn()],
+            ToggleLightSwitch(),
+            [LightSwitchedOff()],
+        ),
     ],
 )
 def test_light_switch_decider(
