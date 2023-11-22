@@ -97,10 +97,6 @@ class LightSwitch(State):
                 typing.assert_never(event)
 
 
-class UnknownLightSwtichStatus(LightSwitch):
-    ...
-
-
 class LightSwitchOn(LightSwitch):
     ...
 
@@ -119,8 +115,6 @@ class LightSwitchService:
             match command:
                 case SwitchLightOn():
                     match state:
-                        case UnknownLightSwtichStatus():
-                            return iter([LightSwitchedOn()])
                         case LightSwitchOff():
                             return iter([LightSwitchedOn()])
                         case LightSwitchOn():
@@ -129,8 +123,6 @@ class LightSwitchService:
                             return typing.assert_never(state)
                 case SwitchLightOff():
                     match state:
-                        case UnknownLightSwtichStatus():
-                            return iter([LightSwitchedOff()])
                         case LightSwitchOn():
                             return iter([LightSwitchedOff()])
                         case LightSwitchOff():
@@ -143,7 +135,7 @@ class LightSwitchService:
         return Decider(
             decide=decide,
             evolve=LightSwitch.evolve,
-            initial_state=UnknownLightSwtichStatus(),
+            initial_state=LightSwitchOff(),
         )
 
 class LightSwitchClient:
