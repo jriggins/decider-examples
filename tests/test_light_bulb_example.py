@@ -138,11 +138,6 @@ class LightSwitchService:
             initial_state=LightSwitchOff(),
         )
 
-class LightSwitchClient:
-    ...
-
-light_switch_client = LightSwitchClient()
-
 @pytest.mark.parametrize(
     "test_name, decider, initial_state, events, command, expected_events",
     [
