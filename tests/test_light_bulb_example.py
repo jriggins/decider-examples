@@ -10,6 +10,20 @@ import pytest
 # Core
 ############
 
+V = typing.TypeVar("V")
+
+
+# class Result(typing.Generic[V]):
+#     def __init__(self, value: V):
+#         self._value = value
+
+#     def bind(self, f: typing.Callable) -> "Result[V]":
+#         ...
+
+# class Success(Result[V]):
+#     def bind(self, f: typing.Callable) -> "Result[V]":
+#         return
+
 
 class BaseModel(pydantic.BaseModel):
     def __eq__(self, other):
@@ -66,6 +80,10 @@ class LightSwitchedOff(LightSwitchEvent):
     ...
 
 
+class ToggleLightSwitchAttemptFailed(LightSwitchEvent):
+    ...
+
+
 ###########
 # Commands
 ###########
@@ -82,8 +100,17 @@ class SwitchLightOn(LightSwitchCommand):
 class SwitchLightOff(LightSwitchCommand):
     ...
 
+
 class ToggleLightSwitch(LightSwitchCommand):
     ...
+
+
+class LightSwitchAdapter:
+    def turn_on(self) -> bool:
+        return True
+
+    def turn_off(self) -> bool:
+        return True
 
 
 ###############
@@ -113,7 +140,7 @@ class LightSwitchOff(LightSwitch):
 
 class LightSwitchService:
     def light_switch_decider(
-        self,
+        self, light_switch_adapter: LightSwitchAdapter
     ) -> Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]:
         def decide(
             command: LightSwitchCommand, state: LightSwitch
@@ -122,25 +149,15 @@ class LightSwitchService:
                 case ToggleLightSwitch():
                     match state:
                         case LightSwitchOff():
-                            return iter([LightSwitchedOn()])
+                            if light_switch_adapter.turn_on():
+                                return iter([LightSwitchedOn()])
+                            else:
+                                return iter([ToggleLightSwitchAttemptFailed()])
                         case LightSwitchOn():
-                            return iter([LightSwitchedOff()])
-                        case _:
-                            return typing.assert_never(state)
-                case SwitchLightOn():
-                    match state:
-                        case LightSwitchOff():
-                            return iter([LightSwitchedOn()])
-                        case LightSwitchOn():
-                            return iter([])
-                        case _:
-                            return typing.assert_never(state)
-                case SwitchLightOff():
-                    match state:
-                        case LightSwitchOn():
-                            return iter([LightSwitchedOff()])
-                        case LightSwitchOff():
-                            return iter([])
+                            if light_switch_adapter.turn_off():
+                                return iter([LightSwitchedOff()])
+                            else:
+                                return iter([ToggleLightSwitchAttemptFailed()])
                         case _:
                             return typing.assert_never(state)
                 case _:
@@ -152,12 +169,28 @@ class LightSwitchService:
             initial_state=LightSwitchOff(),
         )
 
+
+import unittest.mock
+
+success_light_adapter: LightSwitchAdapter = unittest.mock.MagicMock(
+    spec=LightSwitchAdapter
+)
+success_light_adapter.turn_on.return_value = True
+success_light_adapter.turn_off.return_value = True
+
+failure_light_adapter: LightSwitchAdapter = unittest.mock.MagicMock(
+    spec=LightSwitchAdapter
+)
+failure_light_adapter.turn_on.return_value = False
+failure_light_adapter.turn_off.return_value = False
+
+
 @pytest.mark.parametrize(
     "test_name, decider, initial_state, events, command, expected_events",
     [
         (
             "toggle switch when no previous events should turn on",
-            LightSwitchService().light_switch_decider(),
+            LightSwitchService().light_switch_decider(success_light_adapter),
             LightSwitchOff(),
             [],
             ToggleLightSwitch(),
@@ -165,15 +198,15 @@ class LightSwitchService:
         ),
         (
             "toggle switch when on should turn off",
-            LightSwitchService().light_switch_decider(),
+            LightSwitchService().light_switch_decider(success_light_adapter),
             LightSwitchOff(),
-            [LightSwitchedOff()],
-            ToggleLightSwitch(),
             [LightSwitchedOn()],
+            ToggleLightSwitch(),
+            [LightSwitchedOff()],
         ),
         (
             "toggle switch when off should turn on 2",
-            LightSwitchService().light_switch_decider(),
+            LightSwitchService().light_switch_decider(success_light_adapter),
             LightSwitchOff(),
             [LightSwitchedOn(), LightSwitchedOff()],
             ToggleLightSwitch(),
@@ -181,11 +214,27 @@ class LightSwitchService:
         ),
         (
             "toggle switch when on should turn off 2",
-            LightSwitchService().light_switch_decider(),
+            LightSwitchService().light_switch_decider(success_light_adapter),
             LightSwitchOff(),
             [LightSwitchedOn(), LightSwitchedOff(), LightSwitchedOn()],
             ToggleLightSwitch(),
             [LightSwitchedOff()],
+        ),
+        (
+            "toggle switch when no previous events but fails should indicate failure",
+            LightSwitchService().light_switch_decider(failure_light_adapter),
+            LightSwitchOff(),
+            [],
+            ToggleLightSwitch(),
+            [ToggleLightSwitchAttemptFailed()],
+        ),
+        (
+            "toggle switch when on but fails should indicate failure",
+            LightSwitchService().light_switch_decider(failure_light_adapter),
+            LightSwitchOff(),
+            [LightSwitchedOn()],
+            ToggleLightSwitch(),
+            [ToggleLightSwitchAttemptFailed()],
         ),
     ],
 )
