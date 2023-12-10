@@ -1,5 +1,6 @@
 import enum
 import typing
+
 import core
 
 
@@ -19,17 +20,25 @@ class LightSwitchedOn(core.Event):
     ...
 
 
-LightSwitchEvent = typing.TypeVar("LightSwitchEvent", LightSwitchedOff, LightSwitchedOn)
+# I originally wanted to make LightSwitchEvent an abstract base class but could
+# not figure out how to get mypy to not expect it as a possible value in
+# exhaustiveness checks. :/
+LightSwitchEvent: typing.TypeAlias = LightSwitchedOff | LightSwitchedOn
 
 
 class ToggleLightSwitch(core.Command):
     ...
 
 
-LightSwitchCommand = typing.TypeVar("LightSwitchCommand", bound=ToggleLightSwitch)
+LightSwitchCommand: typing.TypeAlias = ToggleLightSwitch
 
 
-class LightSwitchControllerDecider:
+class LightSwitchControllerDecider(
+    core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]
+):
+    def __init__(self):
+        super().__init__(initial_state=LightSwitch())
+
     def evolve(self, state: LightSwitch, event: LightSwitchEvent) -> LightSwitch:
         match event:
             case LightSwitchedOn():
@@ -41,7 +50,7 @@ class LightSwitchControllerDecider:
 
     def decide(
         self, command: LightSwitchCommand, state: LightSwitch
-    ) -> list[core.Event]:
+    ) -> list[LightSwitchEvent]:
         match command:
             case ToggleLightSwitch():
                 match state.status:
@@ -53,7 +62,3 @@ class LightSwitchControllerDecider:
                         typing.assert_never(state.status)
             case _:
                 typing.assert_never(command)
-
-    @property
-    def initial_state(self) -> LightSwitch:
-        return LightSwitch()
