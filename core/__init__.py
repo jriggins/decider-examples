@@ -10,21 +10,27 @@ class BaseModel(pydantic.BaseModel):
         return False
 
 
-class State(BaseModel):
+class Message(BaseModel, abc.ABC):
     ...
 
 
-class Command(BaseModel):
+class Command(Message, abc.ABC):
     ...
 
 
-class Event(BaseModel):
+class Event(Message, abc.ABC):
+    ...
+
+
+class State(BaseModel, abc.ABC):
     ...
 
 
 C = typing.TypeVar("C")
 S = typing.TypeVar("S")
 E = typing.TypeVar("E")
+A = typing.TypeVar("A")
+AR = typing.TypeVar("AR")
 
 
 class Decider(abc.ABC, typing.Generic[C, S, E]):
@@ -37,4 +43,10 @@ class Decider(abc.ABC, typing.Generic[C, S, E]):
 
     @abc.abstractmethod
     def decide(self, command: C, state: S) -> list[E]:
+        ...
+
+
+class Reactor(abc.ABC, typing.Generic[A, AR]):
+    @abc.abstractmethod
+    def react(self, action_result: AR) -> list[A]:
         ...
