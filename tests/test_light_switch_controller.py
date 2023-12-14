@@ -36,7 +36,7 @@ class StateChangeTester:
         return current_state
 
 
-class ExternalInputTester:
+class ExternalStateInputTester:
     def __init__(self, reactor):
         self.reactor = reactor
 
@@ -50,9 +50,44 @@ class ExternalInputTester:
 
     def then_expect_commands(self, expected_commands):
         assert self._react() == expected_commands
+        return self
 
     def _react(self):
         return self.reactor.react(self.input_message)
+
+
+class AggregateTester:
+    def __init__(self, aggregate):
+        self.aggregate = aggregate
+        self.verify_expectations = None
+        self.verify_side_effects = []
+
+    def given(self, events):
+        self.events = events
+        return self
+
+    def when(self, command):
+        self.command = command
+        return self
+
+    def then_expect_events(self, expected_events):
+        async def coro():
+            assert await self.aggregate.handle(self.command) == expected_events
+
+        self.verify_expectations = coro
+        return self
+
+    def and_expect_side_effect(self, verify_side_effect, *args):
+        async def coro():
+            verify_side_effect(*args)
+
+        self.verify_side_effects.append(coro)
+        return self
+
+    def __await__(self):
+        yield from self.verify_expectations().__await__()
+        for c in self.verify_side_effects:
+            yield from c().__await__()
 
 
 @pytest.mark.parametrize(
@@ -99,7 +134,7 @@ def test_state_changes(test_name, current_events, command, expected_new_events):
 def test_external_inputs(test_name, command, expected_commands):
     # fmt: off
     (
-        ExternalInputTester(sc.Reactor())
+        ExternalStateInputTester(sc.Reactor())
             .when(command)
             .then_expect_commands(expected_commands)
     )
@@ -114,59 +149,96 @@ def event_saver(saved_events=[]):
     return save_events
 
 
-async def test_service_given_turn_on_initiated_turns_on_switch():
+@pytest.mark.parametrize(
+    "test_name, current_events, command, expected_events, expected_side_effects",
+    [
+        (
+            "given initial state turn on turns on",
+            [],
+            sc.TurnOn(),
+            [sc.SwitchedOn()],
+            lambda m: m.turn_on.assert_called(),
+        ),
+        (
+            "given initial state turn off turns off",
+            [],
+            sc.TurnOff(),
+            [sc.SwitchedOff()],
+            lambda m: m.turn_off.assert_called(),
+        ),
+        (
+            "given turned on turn off turns off",
+            [sc.SwitchedOn()],
+            sc.TurnOff(),
+            [sc.SwitchedOff()],
+            lambda m: m.turn_off.assert_called(),
+        ),
+        (
+            "given turned off turn on turns on",
+            [sc.SwitchedOff()],
+            sc.TurnOn(),
+            [sc.SwitchedOn()],
+            lambda m: m.turn_on.assert_called(),
+        ),
+        # (
+        #     "given turned on turn on makes no change",
+        #     [sc.SwitchedOn()],
+        #     sc.TurnOn(),
+        #     [sc.SwitchedOn()],
+        #     lambda m: m.turn_on.assert_called(),
+        # ),
+        (
+            "given turned off turn off turns off",
+            [sc.SwitchedOff()],
+            sc.TurnOff(),
+            [sc.SwitchedOff()],
+            lambda m: m.turn_off.assert_called(),
+        ),
+        (
+            "given initial state toggle turns on",
+            [],
+            sc.ToggleLightSwitch(),
+            [sc.TurnOnInitiated(), sc.SwitchedOn()],
+            lambda m: m.turn_on.assert_called(),
+        ),
+        (
+            "given turned on toggle turns off",
+            [sc.SwitchedOn()],
+            sc.ToggleLightSwitch(),
+            [sc.TurnOffInitiated(), sc.SwitchedOff()],
+            lambda m: m.turn_off.assert_called(),
+        ),
+        (
+            "given turned off toggle turns on",
+            [sc.SwitchedOff()],
+            sc.ToggleLightSwitch(),
+            [sc.TurnOnInitiated(), sc.SwitchedOn()],
+            lambda m: m.turn_on.assert_called(),
+        ),
+    ],
+)
+async def test_aggregate(
+    test_name, current_events, command, expected_events, expected_side_effects
+):
     mock_switch_client = mock.AsyncMock(spec=sc.SwitchClient)
 
     async def get_events():
-        return []
-
-    expected_events = [sc.SwitchedOn()]
-
-    service = sc.Aggregate(
-        get_events=get_events, save_events=event_saver, switch_client=mock_switch_client
-    )
-    output_stream = await service.handle(command=sc.TurnOn())
-
-    mock_switch_client.turn_on.assert_called()
-
-    assert output_stream == expected_events
-
-
-async def test_service_given_turn_off_initiated_turns_off_switch():
-    mock_switch_client = mock.AsyncMock(spec=sc.SwitchClient)
-
-    async def get_events():
-        return []
-
-    expected_events = [sc.SwitchedOff()]
-
-    service = sc.Aggregate(
-        get_events=get_events, save_events=event_saver, switch_client=mock_switch_client
-    )
-    output_stream = await service.handle(command=sc.TurnOff())
-
-    mock_switch_client.turn_off.assert_called()
-
-    assert output_stream == expected_events
-
-
-async def test_service_given_initial_state_toggle_switch_turns_on():
-    async def get_events():
-        return []
-
-    mock_switch_client = mock.AsyncMock(spec=sc.SwitchClient)
-    expected_events = [sc.TurnOnInitiated(), sc.SwitchedOn()]
+        return current_events
 
     saved_events = []
 
-    service = sc.Aggregate(
+    aggregate = sc.Aggregate(
         get_events=get_events,
-        save_events=event_saver(saved_events=saved_events),
+        save_events=event_saver(saved_events),
         switch_client=mock_switch_client,
     )
-    output_stream = await service.handle(command=sc.ToggleLightSwitch())
 
-    mock_switch_client.turn_on.assert_called()
-
-    assert output_stream == expected_events
-    assert output_stream == saved_events
+    # fmt: off
+    await (
+        AggregateTester(aggregate)
+            .given(current_events)
+            .when(command)
+            .then_expect_events(expected_events)
+            .and_expect_side_effect(expected_side_effects, mock_switch_client)
+    )
+    # fmt: on

@@ -83,6 +83,11 @@ class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
                     case _:
                         typing.assert_never(state.status)
             case TurnOn():
+                match state.status:
+                    case LightSwitch.Status.OFF:
+                        return [TurnOnInitiated()]
+                    case LightSwitch.Status.ON:
+                        return []
                 return []
             case TurnOff():
                 return []
@@ -136,6 +141,6 @@ class Aggregate(core.Aggregate):
                 await self._switch_client.turn_off()
                 return [SwitchedOff()]
             case ToggleLightSwitch():
-                return await self.compute_new_events_by_orchestrating(command)
+                return await self.compute_state_change_with_reaction(command)
             case _:
                 return []

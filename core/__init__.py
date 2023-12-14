@@ -88,22 +88,28 @@ class Aggregate(abc.ABC, typing.Generic[C, S, E]):
     async def handle(self, command: C) -> list[E]:
         ...
 
-    async def compute_new_events_by_orchestrating(self, command: C) -> list[E]:
-        current_state = await self._compute_current_state()
-        new_events = self._compute_new_events(command, current_state)
-        extra_events = await self._compute_new_events_from_orchestration(new_events)
+    async def compute_state_change_with_reaction(self, command: C) -> list[E]:
+        new_events = await self._compute_state_change(command)
+        extra_events = await self._compute_state_change_with_reaction(new_events)
         new_events.extend(extra_events)
 
         # TODO: make returns Iterables
         return list(await self._save_events(new_events))
 
-    async def _compute_new_events_from_orchestration(self, resulting_events):
-        es = []
+    async def _compute_state_change(self, command):
+        current_state = await self._compute_current_state()
+        new_events = self._compute_new_events(command, current_state)
+        return new_events
+
+    async def _compute_state_change_with_reaction(self, resulting_events):
+        # TODO: See if a nested list comp looks better
+        new_events = []
         for event in resulting_events:
             commands = self._reactor.react(event)
             for command in commands:
-                es.extend(await self.handle(command))
-        return es
+                new_events.extend(await self.handle(command))
+
+        return new_events
 
     def _compute_new_events(self, command, current_state):
         resulting_events = self._decider.decide(command, current_state)
