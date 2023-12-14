@@ -113,12 +113,17 @@ class Aggregate(core.Aggregate):
     def __init__(
         self,
         get_events: typing.Callable[[], typing.Awaitable[list[LightSwitchEvent]]],
+        save_events: typing.Callable[
+            [typing.Iterable[LightSwitchEvent]],
+            typing.Awaitable[typing.Iterable[LightSwitchEvent]],
+        ],
         switch_client: SwitchClient,
     ):
         super().__init__(
             decider=Decider(),
             reactor=Reactor(),
             get_events=get_events,
+            save_events=save_events,
         )
         self._switch_client = switch_client
 
