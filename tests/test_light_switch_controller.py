@@ -94,22 +94,58 @@ class AggregateTester:
     "test_name, current_events, command, expected_new_events",
     [
         (
+            "given initial state turn on initiates turning on",
+            [],
+            sc.TurnOn(),
+            [sc.TurnOnInitiated()],
+        ),
+        (
+            "given initial state turn off does nothing",
+            [],
+            sc.TurnOff(),
+            [],
+        ),
+        (
             "given initial state toggle light switch initiates turning on",
             [],
             sc.ToggleLightSwitch(),
             [sc.TurnOnInitiated()],
         ),
         (
-            "given switch on toggle switch initiates turning off",
-            [sc.SwitchedOn()],
-            sc.ToggleLightSwitch(),
-            [sc.TurnOffInitiated()],
+            "given switch off turn on initiates turning on",
+            [sc.SwitchedOff()],
+            sc.TurnOn(),
+            [sc.TurnOnInitiated()],
+        ),
+        (
+            "given switch off turn off does nothing",
+            [sc.SwitchedOff()],
+            sc.TurnOff(),
+            [],
         ),
         (
             "given switch off toggle switch initiates turning on",
             [sc.SwitchedOff()],
             sc.ToggleLightSwitch(),
             [sc.TurnOnInitiated()],
+        ),
+        (
+            "given switch on turn off initiates turning off",
+            [sc.SwitchedOn()],
+            sc.TurnOff(),
+            [sc.TurnOffInitiated()],
+        ),
+        (
+            "given switch on turn off initiates turning off",
+            [sc.SwitchedOn()],
+            sc.TurnOff(),
+            [sc.TurnOffInitiated()],
+        ),
+        (
+            "given switch on toggle switch initiates turning off",
+            [sc.SwitchedOn()],
+            sc.ToggleLightSwitch(),
+            [sc.TurnOffInitiated()],
         ),
     ],
 )

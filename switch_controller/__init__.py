@@ -90,6 +90,11 @@ class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
                         return []
                 return []
             case TurnOff():
+                match state.status:
+                    case LightSwitch.Status.OFF:
+                        return []
+                    case LightSwitch.Status.ON:
+                        return [TurnOffInitiated()]
                 return []
             case _:
                 typing.assert_never(command)
