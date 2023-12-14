@@ -53,9 +53,7 @@ class TurnOff(core.Command):
 LightSwitchCommand: typing.TypeAlias = ToggleLightSwitch | TurnOn | TurnOff
 
 
-class LightSwitchControllerDecider(
-    core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]
-):
+class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
     def __init__(self):
         super().__init__(initial_state=LightSwitch())
 
@@ -111,25 +109,21 @@ class SwitchClient:
         ...
 
 
-class Aggregate:
-    # def __new__(cls):
-    #     cls.toggle_switch = lambda self, command: self.handle(command)
-    #     cls.test_handle = lambda self, command: self.handle(command)
-
+class Aggregate(core.Aggregate):
     def __init__(
         self,
-        get_events: typing.Callable[
-            [], typing.Awaitable[typing.Iterable[LightSwitchEvent]]
-        ],
+        get_events: typing.Callable[[], typing.Awaitable[list[LightSwitchEvent]]],
         switch_client: SwitchClient,
     ):
-        self._decider = LightSwitchControllerDecider()
-        self._reactor = Reactor()
-        self._get_events = get_events
+        super().__init__(
+            decider=Decider(),
+            reactor=Reactor(),
+            get_events=get_events,
+        )
         self._switch_client = switch_client
 
-    async def handle(self, message: core.Message) -> list[LightSwitchEvent]:
-        match message:
+    async def handle(self, command: core.Command) -> list[LightSwitchEvent]:
+        match command:
             case TurnOn():
                 await self._switch_client.turn_on()
                 return [SwitchedOn()]
@@ -137,19 +131,6 @@ class Aggregate:
                 await self._switch_client.turn_off()
                 return [SwitchedOff()]
             case ToggleLightSwitch():
-                events = await self._get_events()
-                current_state = functools.reduce(
-                    self._decider.evolve,
-                    events,
-                    self._decider.initial_state,
-                )
-                resulting_events = self._decider.decide(message, current_state)
-                es = []
-                for event in resulting_events:
-                    commands = self._reactor.react(event)
-                    for command in commands:
-                        es.extend(await self.handle(command))
-                resulting_events.extend(es)
-                return resulting_events
+                return await self.compute_new_events_by_orchestrating(command)
             case _:
                 return []

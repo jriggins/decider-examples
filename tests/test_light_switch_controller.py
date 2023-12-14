@@ -12,7 +12,7 @@ import switch_controller as sc
 def test_given_initial_state_toggle_light_switch_switches_on():
     events = []
     command = sc.ToggleLightSwitch()
-    decider = sc.LightSwitchControllerDecider()
+    decider = sc.Decider()
 
     expected_events = [sc.TurnOnInitiated()]
 
@@ -30,7 +30,7 @@ def test_given_initial_state_toggle_light_switch_switches_on():
 def test_given_light_switch_on_toggle_light_switch_switches_off():
     events = [sc.SwitchedOn()]
     command = sc.ToggleLightSwitch()
-    decider = sc.LightSwitchControllerDecider()
+    decider = sc.Decider()
 
     expected_events = [sc.TurnOffInitiated()]
 
@@ -48,7 +48,7 @@ def test_given_light_switch_on_toggle_light_switch_switches_off():
 def test_given_light_switch_off_toggle_light_switch_switches_on():
     events = [sc.SwitchedOff()]
     command = sc.ToggleLightSwitch()
-    decider = sc.LightSwitchControllerDecider()
+    decider = sc.Decider()
 
     expected_events = [sc.TurnOnInitiated()]
 
@@ -94,7 +94,7 @@ async def test_service_given_turn_on_initiated_turns_on_switch():
     expected_events = [sc.SwitchedOn()]
 
     service = sc.Aggregate(get_events=get_events, switch_client=mock_switch_client)
-    output_stream = await service.handle(message=sc.TurnOn())
+    output_stream = await service.handle(command=sc.TurnOn())
 
     mock_switch_client.turn_on.assert_called()
 
@@ -110,7 +110,7 @@ async def test_service_given_turn_off_initiated_turns_off_switch():
     expected_events = [sc.SwitchedOff()]
 
     service = sc.Aggregate(get_events=get_events, switch_client=mock_switch_client)
-    output_stream = await service.handle(message=sc.TurnOff())
+    output_stream = await service.handle(command=sc.TurnOff())
 
     mock_switch_client.turn_off.assert_called()
 
@@ -125,7 +125,7 @@ async def test_service_given_initial_state_toggle_switch_turns_on():
     expected_events = [sc.TurnOnInitiated(), sc.SwitchedOn()]
 
     service = sc.Aggregate(get_events=get_events, switch_client=mock_switch_client)
-    output_stream = await service.handle(message=sc.ToggleLightSwitch())
+    output_stream = await service.handle(command=sc.ToggleLightSwitch())
 
     mock_switch_client.turn_on.assert_called()
 
