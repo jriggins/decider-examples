@@ -166,3 +166,4 @@ cython_debug/
 .vscode-server/
 .vscode/
 .bash_history
+.python_history
