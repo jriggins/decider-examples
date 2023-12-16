@@ -13,6 +13,19 @@ class LightSwitch(core.State):
 
     status: Status = Status.OFF
 
+    def evolve(self, state: "LightSwitch", event: "LightSwitchEvent") -> "LightSwitch":
+        match event:
+            case TurnOnInitiated():
+                return state
+            case TurnOffInitiated():
+                return state
+            case SwitchedOn():
+                return state.copy(update={"status": LightSwitch.Status.ON})
+            case SwitchedOff():
+                return state.copy(update={"status": LightSwitch.Status.OFF})
+            case _:
+                typing.assert_never(event)
+
 
 class TurnOnInitiated(core.Event):
     ...
@@ -53,22 +66,12 @@ class TurnOff(core.Command):
 LightSwitchCommand: typing.TypeAlias = ToggleLightSwitch | TurnOn | TurnOff
 
 
-class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
+class Decider(core.Decider):
     def __init__(self):
         super().__init__(initial_state=LightSwitch())
 
     def evolve(self, state: LightSwitch, event: LightSwitchEvent) -> LightSwitch:
-        match event:
-            case TurnOnInitiated():
-                return state
-            case TurnOffInitiated():
-                return state
-            case SwitchedOn():
-                return state.copy(update={"status": LightSwitch.Status.ON})
-            case SwitchedOff():
-                return state.copy(update={"status": LightSwitch.Status.OFF})
-            case _:
-                typing.assert_never(event)
+        return self.initial_state.evolve(state, event)
 
     def decide(
         self, command: LightSwitchCommand, state: LightSwitch

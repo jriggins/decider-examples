@@ -1,93 +1,75 @@
-import functools
 import typing
 from unittest import mock
 
 import pytest
-import core
 
+import tests
+import core
 import switch_controller as sc
 
 
-class StateChangeTester:
-    def __init__(self, decider):
-        self.decider = decider
-
-    def given(self, events):
-        self.events = events
-        return self
-
-    def when(self, command):
-        self.command = command
-        return self
-
-    def then_expect_events(self, expected_events):
-        assert (
-            self.decider.decide(self.command, self._compute_current_state())
-            == expected_events
-        )
-
-    def _compute_current_state(self):
-        current_state = functools.reduce(
-            lambda s, e: self.decider.evolve(s, e),
-            self.events,
-            self.decider.initial_state,
-        )
-
-        return current_state
-
-
-class ExternalStateInputTester:
-    def __init__(self, reactor):
-        self.reactor = reactor
-
-    def given(self, events):
-        self.events = events
-        return self
-
-    def when(self, input_message):
-        self.input_message = input_message
-        return self
-
-    def then_expect_commands(self, expected_commands):
-        assert self._react() == expected_commands
-        return self
-
-    def _react(self):
-        return self.reactor.react(self.input_message)
-
-
-class AggregateTester:
-    def __init__(self, aggregate):
-        self.aggregate = aggregate
-        self.verify_expectations = None
-        self.verify_side_effects = []
-
-    def given(self, events):
-        self.events = events
-        return self
-
-    def when(self, command):
-        self.command = command
-        return self
-
-    def then_expect_events(self, expected_events):
-        async def coro():
-            assert await self.aggregate.handle(self.command) == expected_events
-
-        self.verify_expectations = coro
-        return self
-
-    def and_expect_side_effect(self, verify_side_effect, *args):
-        async def coro():
-            verify_side_effect(*args)
-
-        self.verify_side_effects.append(coro)
-        return self
-
-    def __await__(self):
-        yield from self.verify_expectations().__await__()
-        for c in self.verify_side_effects:
-            yield from c().__await__()
+@pytest.mark.parametrize(
+    "test_name, initial_state, events, expected_new_state",
+    [
+        (
+            "given initial state when switched on switch is on",
+            sc.LightSwitch(),
+            [sc.SwitchedOn()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+        ),
+        (
+            "given switch off when switched off switch is off",
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+            [sc.SwitchedOff()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+        ),
+        (
+            "given switch off when turn off initiated switch is off",
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+            [sc.TurnOffInitiated()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+        ),
+        (
+            "given switch off when turn on initiated switch is off",
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+            [sc.TurnOnInitiated()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+        ),
+        (
+            "given switch on when switched on switch is on",
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+            [sc.SwitchedOn()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+        ),
+        (
+            "given switch on when switched off switch is off",
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+            [sc.SwitchedOff()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.OFF),
+        ),
+        (
+            "given switch on when turn off initiated switch is on",
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+            [sc.TurnOnInitiated()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+        ),
+        (
+            "given switch on when turn on initiated switch is on",
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+            [sc.TurnOffInitiated()],
+            sc.LightSwitch(status=sc.LightSwitch.Status.ON),
+        ),
+    ],
+)
+def test_state_view(test_name, initial_state, events, expected_new_state):
+    # fmt: off
+    (
+        tests.StateViewTester()
+            .given(initial_state)
+            .when(events)
+            .then_expect_state(expected_new_state)
+    )
+    # fmt: on
 
 
 @pytest.mark.parametrize(
@@ -152,7 +134,7 @@ class AggregateTester:
 def test_state_changes(test_name, current_events, command, expected_new_events):
     # fmt: off
     (
-        StateChangeTester(sc.Decider())
+        tests.StateChangeTester(sc.Decider())
             .given(current_events)
             .when(command)
             .then_expect_events(expected_new_events)
@@ -170,7 +152,7 @@ def test_state_changes(test_name, current_events, command, expected_new_events):
 def test_external_inputs(test_name, command, expected_commands):
     # fmt: off
     (
-        ExternalStateInputTester(sc.Reactor())
+        tests.ExternalStateInputTester(sc.Reactor())
             .when(command)
             .then_expect_commands(expected_commands)
     )
@@ -271,10 +253,38 @@ async def test_aggregate(
 
     # fmt: off
     await (
-        AggregateTester(aggregate)
+        tests.AggregateTester(aggregate)
             .given(current_events)
             .when(command)
             .then_expect_events(expected_events)
             .and_expect_side_effect(expected_side_effects, mock_switch_client)
     )
     # fmt: on
+
+
+######
+
+import uuid
+import pydantic
+import dataclasses
+
+
+@dataclasses.dataclass
+class UserFromExternal:
+    id: str
+    name: str
+
+
+class User(pydantic.BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+def test_converts_str_to_uuid():
+    user_external = UserFromExternal(
+        id="A4C6BC9E-92A7-4FFE-963B-BCC0707EC926", name="Test User"
+    )
+
+    user_internal = User(**user_external.__dict__)
+
+    assert type(user_internal.id) == uuid.UUID

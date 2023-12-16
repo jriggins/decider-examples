@@ -1,5 +1,6 @@
 import abc
 import functools
+import re
 import typing
 import pydantic
 
@@ -23,15 +24,19 @@ class Event(Message, abc.ABC):
     ...
 
 
-class State(BaseModel, abc.ABC):
-    ...
-
-
 C = typing.TypeVar("C")
 S = typing.TypeVar("S")
 E = typing.TypeVar("E")
 A = typing.TypeVar("A")
 AR = typing.TypeVar("AR")
+
+
+class State(abc.ABC, BaseModel, typing.Generic[S, E]):
+    initial_state: S | None = None
+
+    @abc.abstractmethod
+    def evolve(self, state: S, event: S) -> S:
+        ...
 
 
 class Decider(abc.ABC, typing.Generic[C, S, E]):
@@ -114,3 +119,7 @@ class Aggregate(abc.ABC, typing.Generic[C, S, E]):
     def _compute_new_events(self, command, current_state):
         resulting_events = self._decider.decide(command, current_state)
         return resulting_events
+
+    def _camel_to_snake(self, name):
+        name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
