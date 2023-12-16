@@ -198,13 +198,6 @@ def event_saver(saved_events=[]):
             [sc.SwitchedOn()],
             lambda m: m.turn_on.assert_called(),
         ),
-        # (
-        #     "given turned on turn on makes no change",
-        #     [sc.SwitchedOn()],
-        #     sc.TurnOn(),
-        #     [sc.SwitchedOn()],
-        #     lambda m: m.turn_on.assert_called(),
-        # ),
         (
             "given turned off turn off turns off",
             [sc.SwitchedOff()],
