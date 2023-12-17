@@ -13,7 +13,8 @@ class StateViewTester:
         return self
 
     def then_expect_state(self, expected_state):
-        assert self._compute_current_state() == expected_state
+        computed_state = self._compute_current_state()
+        assert computed_state == expected_state, f"{computed_state} != {expected_state}"
 
     def _compute_current_state(self):
         current_state = functools.reduce(
@@ -36,10 +37,12 @@ class StateChangeTester:
         return self
 
     def then_expect_events(self, expected_events):
-        assert (
-            self.decider.decide(self.command, self._compute_current_state())
-            == expected_events
+        computed_events = self.decider.decide(
+            self.command, self._compute_current_state()
         )
+        assert (
+            computed_events == expected_events
+        ), f"{computed_events} != {expected_events}"
 
     def _compute_current_state(self):
         current_state = functools.reduce(
@@ -87,7 +90,8 @@ class AggregateTester:
 
     def then_expect_events(self, expected_events):
         async def coro():
-            assert await self.aggregate.handle(self.command) == expected_events
+            new_events = await self.aggregate.handle(self.command)
+            assert new_events == expected_events, f"{new_events} != {expected_events}"
 
         self.verify_expectations = coro
         return self
@@ -96,7 +100,8 @@ class AggregateTester:
         async def coro():
             verify_side_effect(*args)
 
-        self.verify_side_effects.append(coro)
+        if verify_side_effect is not None:
+            self.verify_side_effects.append(coro)
         return self
 
     def __await__(self):

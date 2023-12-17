@@ -43,9 +43,8 @@ class Decider(abc.ABC, typing.Generic[C, S, E]):
     def __init__(self, initial_state: S):
         self.initial_state = initial_state
 
-    @abc.abstractmethod
     def evolve(self, state: S, event: E) -> S:
-        ...
+        return self.initial_state.evolve(state, event)  # type: ignore
 
     @abc.abstractmethod
     def decide(self, command: C, state: S) -> list[E]:
