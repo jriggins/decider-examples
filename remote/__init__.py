@@ -27,6 +27,10 @@ class ToggleSwitch(core.Command):
     ...
 
 
+class SendToggleSwitch(core.Command):
+    ...
+
+
 class MarkSwitchedOn(core.Command):
     ...
 
@@ -78,6 +82,23 @@ class Decider(core.Decider[SwitchCommand, Switch, SwitchEvent]):
                 typing.assert_never(command)
 
 
+class Decider2(core.Decider2):
+    def __init__(self):
+        super().__init__(initial_state=None)
+
+    def decide(self, message: Any, state: Any):
+        match message:
+            case SendToggleSwitch():
+                return message
+                # return core.DelegatedCommand(command=message)
+            case ToggleSwitch():
+                return core.EventStream.from_list([ToggleSwitchInitiated()])
+            case MarkSwitchedOn():
+                return core.EventStream.from_list([SwitchedOn()])
+            case MarkSwitchedOff():
+                return core.EventStream.from_list([SwitchedOff()])
+
+
 class Reactor(core.Reactor[SwitchControllerEvent, SwitchCommand]):
     def react(self, action_result: SwitchControllerEvent) -> list[SwitchCommand]:
         match action_result:
@@ -116,9 +137,25 @@ class Aggregate(core.Aggregate[SwitchCommand, Switch, SwitchEvent]):
 
 class MessageHandler:
     def __init__(self, get_events, switch_controller_client: SwitchControllerClient):
+        self._decider = Decider2()
         self._get_events = get_events
         self._switch_controller_client = switch_controller_client
 
     async def react(self, message: core.Message):
         new_events = await self._switch_controller_client.toggle_switch()
         return new_events
+
+    async def handle(self, message: core.Message):
+        response = self._decider.decide(message, None)
+
+        event_stream = None
+        match response:
+            case core.EventStream():
+                event_stream = response
+            case SendToggleSwitch():
+                event_stream = await self._send_toggle_switch()
+
+        return event_stream
+
+    async def _send_toggle_switch(self):
+        return await self._switch_controller_client.toggle_switch()

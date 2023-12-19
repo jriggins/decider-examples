@@ -24,6 +24,8 @@ class Event(Message, abc.ABC):
     ...
 
 
+M = typing.TypeVar("M")
+R = typing.TypeVar("R")
 C = typing.TypeVar("C")
 S = typing.TypeVar("S")
 E = typing.TypeVar("E")
@@ -122,3 +124,31 @@ class Aggregate(abc.ABC, typing.Generic[C, S, E]):
     def _camel_to_snake(self, name):
         name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
+
+
+class DeciderResponse(BaseModel):
+    ...
+
+
+class EventStream(DeciderResponse, typing.Generic[E]):
+    events: typing.List[E]
+
+    @classmethod
+    def from_list(cls, events=list[E]) -> typing.Self:
+        return cls(events=events)
+
+
+class DelegatedCommand(DeciderResponse):
+    command: Command
+
+
+class Decider2(abc.ABC, typing.Generic[M, S, E, R]):
+    def __init__(self, initial_state: S):
+        self.initial_state = initial_state
+
+    def evolve(self, state: S, event: E) -> S:
+        return self.initial_state.evolve(state, event)  # type: ignore
+
+    @abc.abstractmethod
+    def decide(self, message: M, state: S) -> R:
+        ...
