@@ -19,6 +19,10 @@ class ToggleSwitchInitiated(core.Event):
     ...
 
 
+class ToggleSwitchSent(core.Event):
+    ...
+
+
 class ToggleSwitch(core.Command):
     ...
 
@@ -86,8 +90,8 @@ class Reactor(core.Reactor[SwitchControllerEvent, SwitchCommand]):
 
 
 class SwitchControllerClient:
-    async def toggle_switch(self):
-        ...
+    async def toggle_switch(self) -> list[SwitchEvent]:
+        return []
 
 
 class Aggregate(core.Aggregate[SwitchCommand, Switch, SwitchEvent]):
@@ -99,4 +103,22 @@ class Aggregate(core.Aggregate[SwitchCommand, Switch, SwitchEvent]):
         self._switch_controller_client = switch_controller_client
 
     async def handle(self, command: SwitchCommand) -> list[SwitchEvent]:
-        return [ToggleSwitchInitiated()]
+        match command:
+            case ToggleSwitch():
+                return [ToggleSwitchInitiated()]
+            case MarkSwitchedOn():
+                return [SwitchedOn()]
+            case MarkSwitchedOff():
+                return [SwitchedOff()]
+            case _:
+                typing.assert_never(command)
+
+
+class MessageHandler:
+    def __init__(self, get_events, switch_controller_client: SwitchControllerClient):
+        self._get_events = get_events
+        self._switch_controller_client = switch_controller_client
+
+    async def react(self, message: core.Message):
+        new_events = await self._switch_controller_client.toggle_switch()
+        return new_events

@@ -186,10 +186,66 @@ def event_saver(saved_events=[]):
     "test_name, current_events, command, expected_events, expected_side_effects",
     [
         (
-            "given initial state turn on turns on",
+            "given initial state toggle switch initiates toggle",
             [],
             remote.ToggleSwitch(),
             [remote.ToggleSwitchInitiated()],
+            None,
+        ),
+        (
+            "given switch on toggle switch initiates toggle",
+            [remote.SwitchedOn()],
+            remote.ToggleSwitch(),
+            [remote.ToggleSwitchInitiated()],
+            None,
+        ),
+        (
+            "given switch off toggle switch initiates toggle",
+            [remote.SwitchedOff()],
+            remote.ToggleSwitch(),
+            [remote.ToggleSwitchInitiated()],
+            None,
+        ),
+        (
+            "given initial state mark switch on records switch on",
+            [],
+            remote.MarkSwitchedOn(),
+            [remote.SwitchedOn()],
+            None,
+        ),
+        (
+            "given switched on mark switch on records switch on",
+            [remote.SwitchedOn()],
+            remote.MarkSwitchedOn(),
+            [remote.SwitchedOn()],
+            None,
+        ),
+        (
+            "given switched off mark switch on records switch on",
+            [remote.SwitchedOff()],
+            remote.MarkSwitchedOn(),
+            [remote.SwitchedOn()],
+            None,
+        ),
+        (
+            "given initial state mark switch off records switch off",
+            [],
+            remote.MarkSwitchedOff(),
+            [remote.SwitchedOff()],
+            None,
+        ),
+        (
+            "given switched on mark switch off records switch off",
+            [remote.SwitchedOn()],
+            remote.MarkSwitchedOff(),
+            [remote.SwitchedOff()],
+            None,
+        ),
+        (
+            "given switched off mark switch off records switch off",
+            [remote.SwitchedOff()],
+            remote.MarkSwitchedOff(),
+            [remote.SwitchedOff()],
             None,
         ),
     ],
@@ -219,3 +275,22 @@ async def test_aggregate(
             .and_expect_side_effect(expected_side_effects, mock_switch_client)
     )
     # fmt: on
+
+
+async def test_event_handler():
+    current_events = []
+
+    async def get_events():
+        return current_events
+
+    new_event = remote.ToggleSwitchInitiated()
+    expected_events = [remote.ToggleSwitchSent()]
+    mock_switch_client = mock.AsyncMock(spec=remote.SwitchControllerClient)
+    mock_switch_client.toggle_switch.return_value = [remote.ToggleSwitchSent()]
+
+    new_events = await remote.MessageHandler(
+        get_events=get_events, switch_controller_client=mock_switch_client
+    ).react(new_event)
+
+    assert new_events == expected_events
+    mock_switch_client.toggle_switch.assert_called()
