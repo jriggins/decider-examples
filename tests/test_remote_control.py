@@ -16,55 +16,55 @@ import switch_controller as sc
             "given inital state toggle switch initiates",
             [],
             remote.ToggleSwitch(),
-            [remote.ToggleSwitchInitiated()],
+            core.EventStream(events=[remote.ToggleSwitchInitiated()]),
         ),
         (
             "given switched on toggle switch initiates",
             [remote.SwitchedOn()],
             remote.ToggleSwitch(),
-            [remote.ToggleSwitchInitiated()],
+            core.EventStream(events=[remote.ToggleSwitchInitiated()]),
         ),
         (
             "given switched off toggle switch initiates",
             [remote.SwitchedOff()],
             remote.ToggleSwitch(),
-            [remote.ToggleSwitchInitiated()],
+            core.EventStream(events=[remote.ToggleSwitchInitiated()]),
         ),
         (
             "given inital state mark switched on marks on",
             [],
             remote.MarkSwitchedOn(),
-            [remote.SwitchedOn()],
+            core.EventStream(events=[remote.SwitchedOn()]),
         ),
         (
             "given switched on mark switched on marks on",
             [remote.SwitchedOn()],
             remote.MarkSwitchedOn(),
-            [remote.SwitchedOn()],
+            core.EventStream(events=[remote.SwitchedOn()]),
         ),
         (
             "given switched off mark switched on marks on",
             [remote.SwitchedOff()],
             remote.MarkSwitchedOn(),
-            [remote.SwitchedOn()],
+            core.EventStream(events=[remote.SwitchedOn()]),
         ),
         (
             "given inital state mark switched off marks off",
             [],
             remote.MarkSwitchedOff(),
-            [remote.SwitchedOff()],
+            core.EventStream(events=[remote.SwitchedOff()]),
         ),
         (
             "given switched off mark switched off marks off",
             [remote.SwitchedOn()],
             remote.MarkSwitchedOff(),
-            [remote.SwitchedOff()],
+            core.EventStream(events=[remote.SwitchedOff()]),
         ),
         (
             "given switched off mark switched off marks off",
             [remote.SwitchedOff()],
             remote.MarkSwitchedOff(),
-            [remote.SwitchedOff()],
+            core.EventStream(events=[remote.SwitchedOff()]),
         ),
     ],
 )
@@ -149,31 +149,6 @@ def test_state_view(test_name, initial_state, events, expected_new_state):
     # fmt: on
 
 
-@pytest.mark.parametrize(
-    "test_name, command, expected_commands",
-    [
-        (
-            "when controller is switched on mark remote switched on",
-            sc.SwitchedOn(),
-            [remote.MarkSwitchedOn()],
-        ),
-        (
-            "when controller is switched off mark remote switched off",
-            sc.SwitchedOff(),
-            [remote.MarkSwitchedOff()],
-        ),
-    ],
-)
-def test_external_inputs(test_name, command, expected_commands):
-    # fmt: off
-    (
-        tests.ExternalStateInputTester(remote.Reactor())
-            .when(command)
-            .then_expect_commands(expected_commands)
-    )
-    # fmt: on
-
-
 def event_saver(saved_events=[]):
     async def save_events(events: typing.Iterable[core.Event]):
         saved_events.extend(list(events))
@@ -183,114 +158,101 @@ def event_saver(saved_events=[]):
 
 
 @pytest.mark.parametrize(
-    "test_name, current_events, command, expected_events, expected_side_effects",
+    "test_description,message,expected_response",
     [
         (
-            "given initial state toggle switch initiates toggle",
-            [],
+            "given any state when toggle switch then toggle switch is initiated",
             remote.ToggleSwitch(),
-            [remote.ToggleSwitchInitiated()],
-            None,
+            core.EventStream.from_list([remote.ToggleSwitchInitiated()]),
         ),
         (
-            "given switch on toggle switch initiates toggle",
-            [remote.SwitchedOn()],
-            remote.ToggleSwitch(),
-            [remote.ToggleSwitchInitiated()],
-            None,
+            "given any state when toggle switch then toggle switch is initiated",
+            remote.SendToggleSwitch(),
+            remote.SendToggleSwitch(),
         ),
         (
-            "given switch off toggle switch initiates toggle",
-            [remote.SwitchedOff()],
-            remote.ToggleSwitch(),
-            [remote.ToggleSwitchInitiated()],
-            None,
-        ),
-        (
-            "given initial state mark switch on records switch on",
-            [],
+            "given any state when mark switch on then switch is marked on",
             remote.MarkSwitchedOn(),
-            [remote.SwitchedOn()],
-            None,
+            core.EventStream.from_list([remote.SwitchedOn()]),
         ),
         (
-            "given switched on mark switch on records switch on",
-            [remote.SwitchedOn()],
-            remote.MarkSwitchedOn(),
-            [remote.SwitchedOn()],
-            None,
-        ),
-        (
-            "given switched off mark switch on records switch on",
-            [remote.SwitchedOff()],
-            remote.MarkSwitchedOn(),
-            [remote.SwitchedOn()],
-            None,
-        ),
-        (
-            "given initial state mark switch off records switch off",
-            [],
+            "given any state when mark switch off then switch is marked off",
             remote.MarkSwitchedOff(),
-            [remote.SwitchedOff()],
-            None,
-        ),
-        (
-            "given switched on mark switch off records switch off",
-            [remote.SwitchedOn()],
-            remote.MarkSwitchedOff(),
-            [remote.SwitchedOff()],
-            None,
-        ),
-        (
-            "given switched off mark switch off records switch off",
-            [remote.SwitchedOff()],
-            remote.MarkSwitchedOff(),
-            [remote.SwitchedOff()],
-            None,
+            core.EventStream.from_list([remote.SwitchedOff()]),
         ),
     ],
 )
-async def test_aggregate(
-    test_name, current_events, command, expected_events, expected_side_effects
+def test_state_change(test_description, message, expected_response):
+    decider = remote.Decider()
+    response = decider.decide(message, None)
+
+    assert expected_response == response
+
+
+def set_toggle_switch_response(m):
+    m.toggle_switch.return_value = core.EventStream(events=[remote.ToggleSwitchSent()])
+
+
+@pytest.mark.parametrize(
+    "test_description,input_message,expected_response,setup_mock_client,expected_client_calls,expect_saved_events",
+    [
+        (
+            "",
+            remote.ToggleSwitch(),
+            core.EventStream.from_list([remote.ToggleSwitchInitiated()]),
+            None,
+            None,
+            True,
+        ),
+        (
+            "",
+            remote.SendToggleSwitch(),
+            core.EventStream.from_list([remote.ToggleSwitchSent()]),
+            set_toggle_switch_response,
+            lambda m: m.toggle_switch.assert_called(),
+            False,
+        ),
+        (
+            "",
+            remote.MarkSwitchedOn(),
+            core.EventStream.from_list([remote.SwitchedOn()]),
+            None,
+            None,
+            False,
+        ),
+        (
+            "",
+            remote.MarkSwitchedOff(),
+            core.EventStream.from_list([remote.SwitchedOff()]),
+            None,
+            None,
+            False,
+        ),
+    ],
+)
+async def test_message_handler(
+    test_description,
+    input_message,
+    expected_response,
+    setup_mock_client,
+    expected_client_calls,
+    expect_saved_events,
 ):
+    event_saver = mock.AsyncMock()
+    event_saver.return_value = expected_response
+
     mock_switch_client = mock.AsyncMock(spec=remote.SwitchControllerClient)
+    if setup_mock_client:
+        setup_mock_client(mock_switch_client)
 
-    async def get_events():
-        return current_events
+    message_handler = remote.MessageHandler(None, event_saver, mock_switch_client)
 
-    saved_events = []
+    response = await message_handler.handle(input_message)
 
-    aggregate = remote.Aggregate(
-        get_events=get_events,
-        save_events=event_saver(saved_events),
-        switch_controller_client=mock_switch_client,
-    )
+    assert expected_response == response
 
-    # fmt: off
-    await (
-        tests.MessageHandlerTester(aggregate)
-            .given(current_events)
-            .when(command)
-            .then_expect_events(expected_events)
-            .and_expect_side_effect(expected_side_effects, mock_switch_client)
-    )
-    # fmt: on
+    if expected_client_calls:
+        expected_client_calls(mock_switch_client)
 
-
-async def test_event_handler():
-    current_events = []
-
-    async def get_events():
-        return current_events
-
-    new_event = remote.ToggleSwitchInitiated()
-    expected_events = [remote.ToggleSwitchSent()]
-    mock_switch_client = mock.AsyncMock(spec=remote.SwitchControllerClient)
-    mock_switch_client.toggle_switch.return_value = [remote.ToggleSwitchSent()]
-
-    new_events = await remote.MessageHandler(
-        get_events=get_events, switch_controller_client=mock_switch_client
-    ).react(new_event)
-
-    assert new_events == expected_events
-    mock_switch_client.toggle_switch.assert_called()
+    if expect_saved_events:
+        event_saver.assert_called_with(expected_response)
