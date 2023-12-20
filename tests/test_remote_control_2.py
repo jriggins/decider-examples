@@ -30,7 +30,7 @@ import remote
     ],
 )
 def test_decider(test_description, message, expected_response):
-    decider = remote.Decider2()
+    decider = remote.Decider()
     response = decider.decide(message, None)
 
     assert expected_response == response

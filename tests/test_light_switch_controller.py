@@ -142,21 +142,21 @@ def test_state_changes(test_name, current_events, command, expected_new_events):
     # fmt: on
 
 
-@pytest.mark.parametrize(
-    "test_name, command, expected_commands",
-    [
-        ("when turn on initiated turn on", sc.TurnOnInitiated(), [sc.TurnOn()]),
-        ("when turn off initiated turn off", sc.TurnOffInitiated(), [sc.TurnOff()]),
-    ],
-)
-def test_external_inputs(test_name, command, expected_commands):
-    # fmt: off
-    (
-        tests.ExternalStateInputTester(sc.Reactor())
-            .when(command)
-            .then_expect_commands(expected_commands)
-    )
-    # fmt: on
+# @pytest.mark.parametrize(
+#     "test_name, command, expected_commands",
+#     [
+#         ("when turn on initiated turn on", sc.TurnOnInitiated(), [sc.TurnOn()]),
+#         ("when turn off initiated turn off", sc.TurnOffInitiated(), [sc.TurnOff()]),
+#     ],
+# )
+# def test_external_inputs(test_name, command, expected_commands):
+#     # fmt: off
+#     (
+#         tests.ExternalStateInputTester(sc.Reactor())
+#             .when(command)
+#             .then_expect_commands(expected_commands)
+#     )
+#     # fmt: on
 
 
 def event_saver(saved_events=[]):

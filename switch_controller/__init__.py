@@ -66,7 +66,7 @@ class LightSwitch(core.State):
 
 
 # class Decider(core.Decider2[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
-class Decider(core.Decider2):
+class Decider(core.Decider):
     def __init__(self):
         super().__init__(initial_state=LightSwitch())
 
@@ -105,15 +105,15 @@ class Decider(core.Decider2):
                 typing.assert_never(message)
 
 
-class Reactor(core.Reactor):
-    def react(self, action_result: core.Message) -> list[core.Message]:
-        match action_result:
-            case TurnOnInitiated():
-                return [TurnOn()]
-            case TurnOffInitiated():
-                return [TurnOff()]
-            case _:
-                return []
+# class Reactor(core.Reactor):
+#     def react(self, action_result: core.Message) -> list[core.Message]:
+#         match action_result:
+#             case TurnOnInitiated():
+#                 return [TurnOn()]
+#             case TurnOffInitiated():
+#                 return [TurnOff()]
+#             case _:
+# return []
 
 
 class SwitchClient:
@@ -124,7 +124,7 @@ class SwitchClient:
         ...
 
 
-class MessageHandler:
+class MessageHandler(core.MessageHandler):
     def __init__(
         self,
         get_events: typing.Callable[[], typing.Awaitable[list[LightSwitchEvent]]],
@@ -134,17 +134,12 @@ class MessageHandler:
         ],
         switch_client: SwitchClient,
     ):
-        self._decider = Decider()
-        self._get_events = get_events
-        self._save_events = save_events
+        super().__init__(
+            decider=Decider(),
+            get_events=get_events,
+            save_events=save_events,
+        )
         self._switch_client = switch_client
-        # super().__init__(
-        #     decider=Decider(),
-        #     reactor=Reactor(),
-        #     get_events=get_events,
-        #     save_events=save_events,
-        # )
-        # self._switch_client = switch_client
 
     async def handle(self, message: core.Message) -> list[LightSwitchEvent]:
         current_state = await self._compute_current_state()
@@ -173,9 +168,3 @@ class MessageHandler:
     async def _turn_on(self):
         await self._switch_client.turn_on()
         return [SwitchedOn()]
-
-    async def _compute_current_state(self):
-        events = await self._get_events()
-        return functools.reduce(
-            self._decider.evolve, events, self._decider.initial_state
-        )
