@@ -41,7 +41,7 @@ def set_toggle_switch_response(m):
 
 
 @pytest.mark.parametrize(
-    "test_description,input_message,expected_response,setup_mock_client,expected_client_calls",
+    "test_description,input_message,expected_response,setup_mock_client,expected_client_calls,expect_saved_events",
     [
         (
             "",
@@ -49,6 +49,7 @@ def set_toggle_switch_response(m):
             core.EventStream.from_list([remote.ToggleSwitchInitiated()]),
             None,
             None,
+            True,
         ),
         (
             "",
@@ -56,6 +57,7 @@ def set_toggle_switch_response(m):
             core.EventStream.from_list([remote.ToggleSwitchSent()]),
             set_toggle_switch_response,
             lambda m: m.toggle_switch.assert_called(),
+            False,
         ),
         (
             "",
@@ -63,6 +65,7 @@ def set_toggle_switch_response(m):
             core.EventStream.from_list([remote.SwitchedOn()]),
             None,
             None,
+            False,
         ),
         (
             "",
@@ -70,6 +73,7 @@ def set_toggle_switch_response(m):
             core.EventStream.from_list([remote.SwitchedOff()]),
             None,
             None,
+            False,
         ),
     ],
 )
@@ -79,12 +83,16 @@ async def test_message_handler(
     expected_response,
     setup_mock_client,
     expected_client_calls,
+    expect_saved_events,
 ):
+    event_saver = mock.AsyncMock()
+    event_saver.return_value = expected_response
+
     mock_switch_client = mock.AsyncMock(spec=remote.SwitchControllerClient)
     if setup_mock_client:
         setup_mock_client(mock_switch_client)
 
-    message_handler = remote.MessageHandler(None, mock_switch_client)
+    message_handler = remote.MessageHandler(None, event_saver, mock_switch_client)
 
     response = await message_handler.handle(input_message)
 
@@ -92,3 +100,6 @@ async def test_message_handler(
 
     if expected_client_calls:
         expected_client_calls(mock_switch_client)
+
+    if expect_saved_events:
+        event_saver.assert_called_with(expected_response)

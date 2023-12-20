@@ -76,10 +76,10 @@ def test_state_view(test_name, initial_state, events, expected_new_state):
     "test_name, current_events, command, expected_new_events",
     [
         (
-            "given initial state turn on initiates turning on",
+            "given initial state turn on delegates",
             [],
             sc.TurnOn(),
-            [sc.TurnOnInitiated()],
+            sc.TurnOn(),
         ),
         (
             "given initial state turn off does nothing",
@@ -94,10 +94,10 @@ def test_state_view(test_name, initial_state, events, expected_new_state):
             [sc.TurnOnInitiated()],
         ),
         (
-            "given switch off turn on initiates turning on",
+            "given switch off turn on delegates",
             [sc.SwitchedOff()],
             sc.TurnOn(),
-            [sc.TurnOnInitiated()],
+            sc.TurnOn(),
         ),
         (
             "given switch off turn off does nothing",
@@ -112,16 +112,16 @@ def test_state_view(test_name, initial_state, events, expected_new_state):
             [sc.TurnOnInitiated()],
         ),
         (
-            "given switch on turn off initiates turning off",
+            "given switch on turn off delegates",
             [sc.SwitchedOn()],
             sc.TurnOff(),
-            [sc.TurnOffInitiated()],
+            sc.TurnOff(),
         ),
         (
-            "given switch on turn off initiates turning off",
+            "given switch on turn off delegates",
             [sc.SwitchedOn()],
             sc.TurnOff(),
-            [sc.TurnOffInitiated()],
+            sc.TurnOff(),
         ),
         (
             "given switch on toggle switch initiates turning off",
@@ -181,8 +181,8 @@ def event_saver(saved_events=[]):
             "given initial state turn off turns off",
             [],
             sc.TurnOff(),
-            [sc.SwitchedOff()],
-            lambda m: m.turn_off.assert_called(),
+            None,
+            lambda m: m.turn_off.assert_not_called(),
         ),
         (
             "given turned on turn off turns off",
@@ -202,29 +202,29 @@ def event_saver(saved_events=[]):
             "given turned off turn off turns off",
             [sc.SwitchedOff()],
             sc.TurnOff(),
-            [sc.SwitchedOff()],
-            lambda m: m.turn_off.assert_called(),
+            None,
+            lambda m: m.turn_off.assert_not_called(),
         ),
         (
-            "given initial state toggle turns on",
+            "given initial state toggle initiates turn on",
             [],
             sc.ToggleLightSwitch(),
-            [sc.TurnOnInitiated(), sc.SwitchedOn()],
-            lambda m: m.turn_on.assert_called(),
+            [sc.TurnOnInitiated()],
+            lambda m: m.turn_on.assert_not_called(),
         ),
         (
-            "given turned on toggle turns off",
+            "given turned on toggle initiates turns off",
             [sc.SwitchedOn()],
             sc.ToggleLightSwitch(),
-            [sc.TurnOffInitiated(), sc.SwitchedOff()],
-            lambda m: m.turn_off.assert_called(),
+            [sc.TurnOffInitiated()],
+            lambda m: m.turn_off.assert_not_called(),
         ),
         (
             "given turned off toggle turns on",
             [sc.SwitchedOff()],
             sc.ToggleLightSwitch(),
-            [sc.TurnOnInitiated(), sc.SwitchedOn()],
-            lambda m: m.turn_on.assert_called(),
+            [sc.TurnOnInitiated()],
+            lambda m: m.turn_on.assert_not_called(),
         ),
     ],
 )
@@ -238,7 +238,7 @@ async def test_aggregate(
 
     saved_events = []
 
-    aggregate = sc.Aggregate(
+    aggregate = sc.MessageHandler(
         get_events=get_events,
         save_events=event_saver(saved_events),
         switch_client=mock_switch_client,
@@ -246,7 +246,7 @@ async def test_aggregate(
 
     # fmt: off
     await (
-        tests.AggregateTester(aggregate)
+        tests.MessageHandlerTester(aggregate)
             .given(current_events)
             .when(command)
             .then_expect_events(expected_events)

@@ -1,4 +1,5 @@
 import enum
+import functools
 import typing
 
 import core
@@ -64,15 +65,15 @@ class LightSwitch(core.State):
                 typing.assert_never(event)
 
 
-class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
+# class Decider(core.Decider2[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
+class Decider(core.Decider2):
     def __init__(self):
         super().__init__(initial_state=LightSwitch())
 
-
     def decide(
-        self, command: LightSwitchCommand, state: LightSwitch
+        self, message: core.Message, state: LightSwitch
     ) -> list[LightSwitchEvent]:
-        match command:
+        match message:
             case ToggleLightSwitch():
                 match state.status:
                     case LightSwitch.Status.OFF:
@@ -84,7 +85,7 @@ class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
             case TurnOn():
                 match state.status:
                     case LightSwitch.Status.OFF:
-                        return [TurnOnInitiated()]
+                        return message
                     case LightSwitch.Status.ON:
                         return []
                 return []
@@ -93,10 +94,15 @@ class Decider(core.Decider[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
                     case LightSwitch.Status.OFF:
                         return []
                     case LightSwitch.Status.ON:
-                        return [TurnOffInitiated()]
+                        return message
                 return []
+            case TurnOnInitiated():
+                return TurnOn()
+            case TurnOffInitiated():
+                return TurnOff()
             case _:
-                typing.assert_never(command)
+                # TODO: Fix
+                typing.assert_never(message)
 
 
 class Reactor(core.Reactor):
@@ -118,7 +124,7 @@ class SwitchClient:
         ...
 
 
-class Aggregate(core.Aggregate):
+class MessageHandler:
     def __init__(
         self,
         get_events: typing.Callable[[], typing.Awaitable[list[LightSwitchEvent]]],
@@ -128,23 +134,48 @@ class Aggregate(core.Aggregate):
         ],
         switch_client: SwitchClient,
     ):
-        super().__init__(
-            decider=Decider(),
-            reactor=Reactor(),
-            get_events=get_events,
-            save_events=save_events,
-        )
+        self._decider = Decider()
+        self._get_events = get_events
+        self._save_events = save_events
         self._switch_client = switch_client
+        # super().__init__(
+        #     decider=Decider(),
+        #     reactor=Reactor(),
+        #     get_events=get_events,
+        #     save_events=save_events,
+        # )
+        # self._switch_client = switch_client
 
-    async def handle(self, command: core.Command) -> list[LightSwitchEvent]:
-        match command:
+    async def handle(self, message: core.Message) -> list[LightSwitchEvent]:
+        current_state = await self._compute_current_state()
+        response = self._decider.decide(message, current_state)
+
+        event_stream = None
+        match response:
+            case [core.Event()]:
+                # case core.EventStream():
+                event_stream = response
             case TurnOn():
-                await self._switch_client.turn_on()
-                return [SwitchedOn()]
+                event_stream = await self._turn_on()
             case TurnOff():
-                await self._switch_client.turn_off()
-                return [SwitchedOff()]
-            case ToggleLightSwitch():
-                return await self.compute_state_change_with_reaction(command)
-            case _:
-                return []
+                event_stream = await self._turn_off()
+
+        if event_stream:
+            saved_event_stream = await self._save_events(event_stream)
+            return saved_event_stream
+        else:
+            return None
+
+    async def _turn_off(self):
+        await self._switch_client.turn_off()
+        return [SwitchedOff()]
+
+    async def _turn_on(self):
+        await self._switch_client.turn_on()
+        return [SwitchedOn()]
+
+    async def _compute_current_state(self):
+        events = await self._get_events()
+        return functools.reduce(
+            self._decider.evolve, events, self._decider.initial_state
+        )

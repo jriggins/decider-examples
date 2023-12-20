@@ -74,7 +74,7 @@ class ExternalStateInputTester:
         return self.reactor.react(self.input_message)
 
 
-class AggregateTester:
+class MessageHandlerTester:
     def __init__(self, aggregate):
         self.aggregate = aggregate
         self.verify_expectations = None

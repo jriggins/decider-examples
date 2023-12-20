@@ -268,7 +268,7 @@ async def test_aggregate(
 
     # fmt: off
     await (
-        tests.AggregateTester(aggregate)
+        tests.MessageHandlerTester(aggregate)
             .given(current_events)
             .when(command)
             .then_expect_events(expected_events)

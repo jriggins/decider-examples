@@ -136,14 +136,13 @@ class Aggregate(core.Aggregate[SwitchCommand, Switch, SwitchEvent]):
 
 
 class MessageHandler:
-    def __init__(self, get_events, switch_controller_client: SwitchControllerClient):
+    def __init__(
+        self, get_events, save_events, switch_controller_client: SwitchControllerClient
+    ):
         self._decider = Decider2()
         self._get_events = get_events
+        self._save_events = save_events
         self._switch_controller_client = switch_controller_client
-
-    async def react(self, message: core.Message):
-        new_events = await self._switch_controller_client.toggle_switch()
-        return new_events
 
     async def handle(self, message: core.Message):
         response = self._decider.decide(message, None)
@@ -155,7 +154,11 @@ class MessageHandler:
             case SendToggleSwitch():
                 event_stream = await self._send_toggle_switch()
 
-        return event_stream
+        if event_stream:
+            saved_event_stream = await self._save_events(event_stream)
+            return saved_event_stream
+        else:
+            return None
 
     async def _send_toggle_switch(self):
         return await self._switch_controller_client.toggle_switch()
