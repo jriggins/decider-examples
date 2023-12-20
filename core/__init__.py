@@ -40,20 +40,6 @@ class State(abc.ABC, BaseModel, typing.Generic[S, E]):
         ...
 
 
-# class Reactor(abc.ABC, typing.Generic[AR, A]):
-#     @abc.abstractmethod
-#     def react(self, action_result: AR) -> list[A]:
-#         ...
-
-
-# class NoneReactor(Reactor):
-#     def react(self, action_result: AR) -> list[A]:
-#         return []
-
-
-# NONE_REACTOR = NoneReactor()
-
-
 class DeciderResponse(BaseModel):
     ...
 
@@ -80,9 +66,6 @@ class Decider(abc.ABC, typing.Generic[M, S, E, R]):
     @abc.abstractmethod
     def decide(self, message: M, state: S) -> R:
         ...
-
-
-# Decider = Decider2
 
 
 class MessageHandler(abc.ABC, typing.Generic[M, S, E, R]):

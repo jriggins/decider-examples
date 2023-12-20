@@ -1,5 +1,4 @@
 import enum
-import functools
 import typing
 
 import core
@@ -65,7 +64,6 @@ class LightSwitch(core.State):
                 typing.assert_never(event)
 
 
-# class Decider(core.Decider2[LightSwitchCommand, LightSwitch, LightSwitchEvent]):
 class Decider(core.Decider):
     def __init__(self):
         super().__init__(initial_state=LightSwitch())
@@ -103,17 +101,6 @@ class Decider(core.Decider):
             case _:
                 # TODO: Fix
                 typing.assert_never(message)
-
-
-# class Reactor(core.Reactor):
-#     def react(self, action_result: core.Message) -> list[core.Message]:
-#         match action_result:
-#             case TurnOnInitiated():
-#                 return [TurnOn()]
-#             case TurnOffInitiated():
-#                 return [TurnOff()]
-#             case _:
-# return []
 
 
 class SwitchClient:

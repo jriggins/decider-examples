@@ -54,26 +54,6 @@ class StateChangeTester:
         return current_state
 
 
-# class ExternalStateInputTester:
-#     def __init__(self, reactor: core.Reactor):
-#         self.reactor = reactor
-
-#     def given(self, events):
-#         self.events = events
-#         return self
-
-#     def when(self, input_message):
-#         self.input_message = input_message
-#         return self
-
-#     def then_expect_commands(self, expected_commands):
-#         assert self._react() == expected_commands
-#         return self
-
-#     def _react(self):
-#         return self.reactor.react(self.input_message)
-
-
 class MessageHandlerTester:
     def __init__(self, aggregate):
         self.aggregate = aggregate

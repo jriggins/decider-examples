@@ -1,9 +1,7 @@
 import enum
 import typing
-from typing import Any, Coroutine
 
 import core
-
 import switch_controller as sc
 
 
@@ -66,28 +64,11 @@ class Switch(core.State):
         return self
 
 
-# # class Decider(core.Decider2[SwitchCommand, Switch, SwitchEvent]):
-# class Decider(core.Decider2):
-#     def __init__(self):
-#         super().__init__(initial_state=Switch())
-
-#     def decide(self, command: SwitchCommand, state: Switch) -> list[SwitchEvent]:
-#         match command:
-#             case ToggleSwitch():
-#                 return [ToggleSwitchInitiated()]
-#             case MarkSwitchedOn():
-#                 return [SwitchedOn()]
-#             case MarkSwitchedOff():
-#                 return [SwitchedOff()]
-#             case _:
-#                 typing.assert_never(command)
-
-
 class Decider(core.Decider):
     def __init__(self):
-        super().__init__(initial_state=None)
+        super().__init__(initial_state=Switch())
 
-    def decide(self, message: Any, state: Any):
+    def decide(self, message: typing.Any, state: typing.Any):
         match message:
             case SendToggleSwitch():
                 return message
@@ -98,17 +79,6 @@ class Decider(core.Decider):
                 return core.EventStream.from_list([SwitchedOn()])
             case MarkSwitchedOff():
                 return core.EventStream.from_list([SwitchedOff()])
-
-
-# class Reactor(core.Reactor[SwitchControllerEvent, SwitchCommand]):
-#     def react(self, action_result: SwitchControllerEvent) -> list[SwitchCommand]:
-#         match action_result:
-#             case sc.SwitchedOn():
-#                 return [MarkSwitchedOn()]
-#             case sc.SwitchedOff():
-#                 return [MarkSwitchedOff()]
-#             case _:
-#                 typing.assert_never(action_result)
 
 
 class SwitchControllerClient:
